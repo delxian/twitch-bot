@@ -24,10 +24,8 @@ class UserRole(IntFlag):
     OWNER = 1 << 4
 
     def __str__(self):
-        output = []
-        for role in reversed(UserRole):
-            if role and self & role:
-                output.append(role.name.lower())  # type: ignore
+        output = [role.name.lower() for role in reversed(UserRole)  # type: ignore
+                  if role and self & role]
         return '+'.join(output)
 
     @classmethod
@@ -73,7 +71,7 @@ class CommandPerm(IntEnum):
         if role & UserRole.OWNER:
             return DenialReason.NONE
         allowed = role & UserRole.SUB if self == CommandPerm.SUB else role >= self
-        return DenialReason.PERMISSION if not allowed else DenialReason.NONE
+        return DenialReason.NONE if allowed else DenialReason.PERMISSION
 
 
 @dataclass(slots=True)
@@ -173,7 +171,7 @@ class Parameters:
                 params.append(parameter)
             else:
                 params.append(clause)
-        if len(set(param.name for param in params if isinstance(param, Parameter))) != len(params):
+        if len({param.name for param in params if isinstance(param, Parameter)}) != len(params):
             raise ParameterError("Duplicate parameter(s)")
         return Parameters(params)
 
@@ -196,7 +194,7 @@ class Command:
         self.desc = desc
         self.perm = perm
         self.prefix = prefix
-        self.aliases = aliases if aliases else []
+        self.aliases = aliases or []
         self.global_cd = global_cd
         self.user_cd = 0 if user_cd <= global_cd else user_cd
         self.hide = hide
@@ -219,13 +217,12 @@ class Command:
 
     def toggle(self, active: bool, channel: str | None = None):
         """Toggles a command globally or per-channel."""
-        if channel is not None:
-            if active:
-                self.disabled_channels.discard(channel)
-            else:
-                self.disabled_channels.add(channel)
-        else:
+        if channel is None:
             self.active = active
+        elif active:
+            self.disabled_channels.discard(channel)
+        else:
+            self.disabled_channels.add(channel)
 
     def apply_cooldown(self, channel: BaseChannel, msg: ChatMessage,
                        global_cd: int | None = None,
@@ -267,9 +264,8 @@ class Command:
             cooldown = int(channel.userdata.cooldowns[username][self.name] - time.perf_counter())
             printc(f'Command "{self.name}" still on cooldown ' \
                    f'for user "{username}" for {cooldown} seconds.', RGB.YELLOW)
-        if reason & DenialReason.PERMISSION:
-            if not self.hide:
-                await channel.send(f"@{username} Insufficient perms ({self.perm})")
+        if reason & DenialReason.PERMISSION and not self.hide:
+            await channel.send(f"@{username} Insufficient perms ({self.perm})")
 
     async def execute(self, bot: BaseBot, msg: ChatMessage,
                       channel: BaseChannel, arg_string: str | None):
@@ -299,7 +295,7 @@ class Command:
         Get Command instance from command name.
         If the command doesn't exist, return `None`.
         """
-        return cls.commands.get(name, None)
+        return cls.commands.get(name)
 
     @classmethod
     def get_by_trigger(cls, trigger: str) -> Command | None:

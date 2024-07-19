@@ -112,7 +112,7 @@ class MessageParser:
         if data:
             message = " :".join(data)
             if ord(message[0]) == 1 and message[1:7] == "ACTION":
-                message = "/me"+message[7:-1]
+                message = f"/me{message[7:-1]}"
             return message.strip()
         return None
 

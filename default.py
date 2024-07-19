@@ -66,7 +66,7 @@ async def toggle_bot(ctx: BaseContext):
 @Command.command("cmds", None, "List all commands in chat.", global_cd=10)
 async def show_commands(ctx: BaseContext):
     command_displays = []
-    cmds = list(cmd for cmd in Command.commands.values())
+    cmds = list(Command.commands.values())
     for cmd in cmds:
         if cmd.hide:
             continue
@@ -125,7 +125,7 @@ async def toggle_command(ctx: BaseContext):
     await ctx.channel.send(
         f'Command "{ctx.args["command"]}" ' \
         f'{"enabled" if active else "disabled"}' \
-        f'{" globally" if not channel else ""}.'
+        f'{"" if channel else " globally"}.'
         )
 
 @Command.command("prefix", "[admin:prefix]",

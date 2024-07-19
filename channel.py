@@ -125,10 +125,10 @@ class UserData:
             word = word.strip()
             if (match := re.match(r"@?(\w+),?", word)):
                 print(word)
-                if match.group(1).lower() in self.users:
+                if match[1].lower() in self.users:
                     index = 2 if word.startswith('@') else 1
-                    print(index, word[:index]+'|'+word[index:])
-                    words[i] = word[:index]+'|'+word[index:]
+                    print(index, f'{word[:index]}|{word[index:]}')
+                    words[i] = f'{word[:index]}|{word[index:]}'
         return ' '.join(words)
 
 

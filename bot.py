@@ -53,7 +53,7 @@ def read_time(unix: int | float | str, time_type: Literal["stamp", "word"]) -> s
         return f"{day}:{':'.join(hms_time)}.{milli.zfill(3)}"
     word_time = list(
             filter(lambda x: not x.startswith('0'),
-                   [day+'d', hms_time[0]+'h', hms_time[1]+'m', hms_time[2]+'s'])
+                   [f"{day}d", f"{hms_time[0]}h", f"{hms_time[1]}m", f"{hms_time[2]}s"])
         )
     return ' '.join(word_time) if word_time else "0s"
 
@@ -139,8 +139,8 @@ class BaseConfig:
                 return False
             match field_name:
                 case "USERNAMES_FOLDER":
-                    if not any(separator in field_value
-                               for separator in (os.path.sep, os.path.altsep)):
+                    if all(separator not in field_value
+                           for separator in (os.path.sep, os.path.altsep)):
                         return False
                 case "RICH_IRC" | "SHOW_ERRORS":
                     if not isinstance(field_value, bool):
@@ -254,7 +254,7 @@ class BaseBot:
                 printc(f"Restarting the bot... (Count: {self.restarts})", RGB.ORANGE)
                 self.running = False
                 await self.start()
-            except:  # pylint: disable=bare-except
+            except Exception:
                 print(traceback.format_exc())
 
     async def _set_up_channels(self):
@@ -277,24 +277,24 @@ class BaseBot:
                         "376", "GLOBALUSERSTATE", "HOSTTARGET"}:
             return
         handlers = {
-            "001": self.handle_001,
-            "CAP * ACK": self.handle_cap_ack,
-            "PING": self.handle_ping,
-            "RECONNECT": self.handle_reconnect,
-            "WHISPER": self.handle_whisper,
-            "353": self.handle_353,
-            "JOIN": self.handle_join,
-            "PART": self.handle_part,
-            "366": self.handle_366,
-            "NOTICE": self.handle_notice,
-            "USERSTATE": self.handle_userstate,
-            "ROOMSTATE": self.handle_roomstate,
-            "CLEARCHAT": self.handle_clearchat,
-            "CLEARMSG": self.handle_clearmsg,
-            "USERNOTICE": self.handle_usernotice,
-            "PRIVMSG": self.handle_privmsg  # any user-sent message
+            "001": self._handle_001,
+            "CAP * ACK": self._handle_cap_ack,
+            "PING": self._handle_ping,
+            "RECONNECT": self._handle_reconnect,
+            "WHISPER": self._handle_whisper,
+            "353": self._handle_353,
+            "JOIN": self._handle_join,
+            "PART": self._handle_part,
+            "366": self._handle_366,
+            "NOTICE": self._handle_notice,
+            "USERSTATE": self._handle_userstate,
+            "ROOMSTATE": self._handle_roomstate,
+            "CLEARCHAT": self._handle_clearchat,
+            "CLEARMSG": self._handle_clearmsg,
+            "USERNOTICE": self._handle_usernotice,
+            "PRIVMSG": self._handle_privmsg  # any user-sent message
             }
-        if (handler := handlers.get(msg.type_, None)):
+        if (handler := handlers.get(msg.type_)):
             if msg.type_ in {"001", "CAP * ACK", "PING", "RECONNECT", "WHISPER"}:
                 await handler(msg)
             else:
@@ -303,42 +303,41 @@ class BaseBot:
         elif self.config.rich_irc:
             print(f"Unhandled IRC type: {msg} {msg.raw}")
 
-    async def handle_001(self, msg: LoginMessage):
+    async def _handle_001(self, msg: LoginMessage):
         if not self.config.rich_irc:
             return
         print(f'<[{color(msg.type_, RGB.ORANGE)}] {color("Login successful!", RGB.GREEN)}')
 
-    async def handle_cap_ack(self, msg: CapabilitiesMessage):
-        if self.config.capability:
-            if set(msg.capabilities) != set(self.config.capability):
-                raise RuntimeError("Acquired capabilities do not match requested")
+    async def _handle_cap_ack(self, msg: CapabilitiesMessage):
+        if self.config.capability and set(msg.capabilities) != set(self.config.capability):
+            raise RuntimeError("Acquired capabilities do not match requested")
         if self.config.rich_irc:
             print(f'<[{color(msg.type_, RGB.ORANGE)}] {", ".join(msg.capabilities)}')
 
-    async def handle_ping(self, msg: PingMessage):
+    async def _handle_ping(self, msg: PingMessage):
         await self.irc.pong()  # type: ignore
         if self.config.rich_irc:
             print(f'<[{color(msg.type_, RGB.ORANGE)}]')
 
-    async def handle_reconnect(self, msg: ReconnectMessage):
+    async def _handle_reconnect(self, msg: ReconnectMessage):
         # server will disconnect for you, just clean up/save
         if self.config.rich_irc:
             print(f'<[{color(msg.type_, RGB.ORANGE)}]')
 
-    async def handle_whisper(self, msg: WhisperMessage):
+    async def _handle_whisper(self, msg: WhisperMessage):
         print(f'<[{color(msg.type_, RGB.ORANGE)}] ' \
               f'{msg.from_} >> {msg.to}: {color(msg.message, SGR.YELLOW)}')
 
-    async def handle_353(self, channel: BaseChannel, msg: NamesMessage):
+    async def _handle_353(self, channel: BaseChannel, msg: NamesMessage):
         channel.userdata.users.update(set(msg.users))
 
-    async def handle_join(self, channel: BaseChannel, msg: JoinMessage):
+    async def _handle_join(self, channel: BaseChannel, msg: JoinMessage):
         channel.userdata.users.add(msg.user)
 
-    async def handle_part(self, channel: BaseChannel, msg: PartMessage):
+    async def _handle_part(self, channel: BaseChannel, msg: PartMessage):
         channel.userdata.users.discard(msg.user)
 
-    async def handle_366(self, channel: BaseChannel, msg: EndOfNamesMessage):
+    async def _handle_366(self, channel: BaseChannel, msg: EndOfNamesMessage):
         # channel connection message (end of connected users list)
         channel.connected = True
         output_366: str = f'Successfully connected to {color(f"#{channel.name}", SGR.BLUE)}! ' \
@@ -356,25 +355,25 @@ class BaseBot:
             dummy_msg = ChatMessage('', '', '', '', '', {})
             await status_cmd(BaseContext(self, dummy_msg, channel))
 
-    async def handle_notice(self, channel: BaseChannel, msg: NoticeMessage):
+    async def _handle_notice(self, channel: BaseChannel, msg: NoticeMessage):
         assert msg.message, f'Expected msg.message from "{msg.type_}"'
         print(f'<[{color(msg.type_, RGB.ORANGE)}] ' \
                 f'<{color(f"#{channel.name}", SGR.BLUE)}> ' \
                 f'{msg.message} ({msg.tags["msg-id"]})')
 
-    async def handle_userstate(self, channel: BaseChannel, msg: UserstateMessage):
+    async def _handle_userstate(self, channel: BaseChannel, msg: UserstateMessage):
         channel.mod = msg.tags["mod"] == "1"
 
-    async def handle_roomstate(self, channel: BaseChannel, msg: RoomstateMessage):
+    async def _handle_roomstate(self, channel: BaseChannel, msg: RoomstateMessage):
         if not self.config.rich_irc:
             return
-        output_roomstate: list[str] = []
         if (len(msg.tags) > 1
-            and not any(int(value) == 1 for value in msg.tags.values())
+            and all(int(value) != 1 for value in msg.tags.values())
             and int(msg.tags["followers-only"]) == -1):
             print(f'<[{color(msg.type_, RGB.ORANGE)}] ' \
                   f'<{color(f"#{channel.name}", SGR.BLUE)}> Chat in default state.')
         else:
+            output_roomstate: list[str] = []
             if len(msg.tags) == 1:
                 output_roomstate.append(f"{tuple(msg.tags.keys())[0]} mode disabled.")
             else:
@@ -392,7 +391,7 @@ class BaseBot:
                   f'<{color(f"#{channel.name}", SGR.BLUE)}> ' \
                   f'{" ".join(output_roomstate)}')
 
-    async def handle_clearchat(self, channel: BaseChannel, msg: ClearchatMessage):
+    async def _handle_clearchat(self, channel: BaseChannel, msg: ClearchatMessage):
         if msg.user:
             if "ban-duration" in msg.tags:
                 output_cc: str = f'User "{msg.user}" timed out for {msg.tags["ban-duration"]}s'
@@ -413,11 +412,11 @@ class BaseBot:
                   f'<{color(f"#{channel.name}", SGR.BLUE)}> ' \
                   f'Chat was cleared by a moderator')
 
-    async def handle_clearmsg(self, channel: BaseChannel, msg: ClearmsgMessage):
+    async def _handle_clearmsg(self, channel: BaseChannel, msg: ClearmsgMessage):
         print(f'<[{color(msg.type_, RGB.ORANGE)}] <{color(f"#{channel.name}", SGR.BLUE)}> ' \
               f'Message from "{msg.tags["login"]}" deleted: {msg.message}')
 
-    async def handle_usernotice(self, channel: BaseChannel, msg: UsernoticeMessage):
+    async def _handle_usernotice(self, channel: BaseChannel, msg: UsernoticeMessage):
         system_message = msg.tags["system-msg"].replace(r"\s",' ')
         if system_message:
             system_message += " - "
@@ -426,7 +425,7 @@ class BaseBot:
         print(f'<[{color(msg.type_, RGB.ORANGE)}] <{color(f"#{channel.name}", SGR.BLUE)}> ' \
               f'({msg.tags["msg-id"]}) {system_message}{login_user}{notice_message}')
 
-    async def handle_privmsg(self, channel: BaseChannel, msg: ChatMessage):
+    async def _handle_privmsg(self, channel: BaseChannel, msg: ChatMessage):
         # store/update user_id data
         user_id = msg.tags["user-id"]
         if msg.user not in channel.uid_manager.users[user_id]:

@@ -24,7 +24,7 @@ class TwitchIRCClient:
     """IRC client for communicating with Twitch via websocket."""
     def __init__(self, websocket: WebSocketCommonProtocol | None = None,
                  rich_irc: bool = False):
-        self.websocket = websocket if websocket else NullWebsocket()
+        self.websocket = websocket or NullWebsocket()
         self.rich_irc = rich_irc
 
     async def _pass(self, oauth: str):
