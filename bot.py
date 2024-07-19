@@ -483,12 +483,3 @@ class BaseBot:
         channel.userdata.history[msg.user].append((unix, msg.message))
 
         await Command.check_command(self, msg)
-
-
-# https://github.com/PythonistaGuild/TwitchIO
-# https://github.com/Teekeks/pyTwitchAPI
-# https://dev.twitch.tv/docs/authentication/
-# https://dev.twitch.tv/docs/irc/chat-commands/
-# https://dev.twitch.tv/docs/pubsub/
-# https://dev.twitch.tv/docs/eventsub/
-# https://dev.twitch.tv/docs/api/
